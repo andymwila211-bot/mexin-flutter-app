@@ -1,27 +1,23 @@
 name: Flutter Build
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# FIX: Force the runner to use Node 24 for all actions globally
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # FIX: Use the latest stable versions available in 2026
       - name: Checkout code
-        uses: actions/checkout@v4 
+        uses: actions/checkout@v4
 
-      # CRITICAL: Flutter 3.19+ often requires JDK 17 for Android builds
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -29,18 +25,17 @@ jobs:
           flutter-version: "3.19.x"
           cache: true
 
+      - name: Accept Android Licenses
+        run: yes | flutter doctor --android-licenses
+
       - name: Install dependencies
+        # If your app is in the root, remove 'cd mexin-flutter-app'
+        # If it IS in that folder, keep it. 
         run: |
-          cd mexin-flutter-app
+          cd mexin-flutter-app || echo "Directory not found, staying in root"
           flutter pub get
 
       - name: Build Debug APK
         run: |
-          cd mexin-flutter-app
+          cd mexin-flutter-app || echo "Directory not found, staying in root"
           flutter build apk --debug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: mexin-flutter-app/build/app/outputs/flutter-apk/app-debug.apk
