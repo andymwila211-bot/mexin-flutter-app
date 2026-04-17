@@ -1,0 +1,35 @@
+name: Flutter Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "stable"
+
+      - name: Install dependencies
+        run: |
+          cd mexin-flutter-app
+          flutter pub get
+
+      - name: Build Debug APK
+        run: |
+          cd mexin-flutter-app
+          flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v2
+        with:
+          name: debug-apk
+          path: mexin-flutter-app/build/app/outputs/flutter-apk/app-debug.apk
