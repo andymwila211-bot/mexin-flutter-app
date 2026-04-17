@@ -11,17 +11,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # FIX 1: Updated to v4 to resolve the Node.js 20 deprecation warning
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.19.x"
+          cache: true # Optional: Speeds up future builds
 
       - name: Get Flutter info
         run: flutter --version
 
+      # FIX 2: Ensure the path 'mexin-flutter-app' exists. 
+      # If your pubspec.yaml is in the root, remove the 'cd' lines.
       - name: Install dependencies
         run: |
           cd mexin-flutter-app
@@ -36,5 +40,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
+          # Double-check this path matches your project structure
           path: mexin-flutter-app/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
