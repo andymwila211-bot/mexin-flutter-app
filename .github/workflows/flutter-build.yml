@@ -6,22 +6,21 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "stable"
-          cache: true
+          flutter-version: "3.19.x"
+
+      - name: Get Flutter info
+        run: flutter --version
 
       - name: Install dependencies
         run: |
@@ -34,7 +33,7 @@ jobs:
           flutter build apk --debug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: debug-apk
           path: mexin-flutter-app/build/app/outputs/flutter-apk/app-debug.apk
