@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ─────────────────────────────────────────────
       # 1. Checkout repository
       # ─────────────────────────────────────────────
@@ -24,16 +25,19 @@ jobs:
 
       # ─────────────────────────────────────────────
       # 2. Java 17
+      #
+      # IMPORTANT:
+      # No Gradle cache here because the Gradle project
+      # is still inside the ZIP at this point.
       # ─────────────────────────────────────────────
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: temurin
-          cache: gradle
 
       # ─────────────────────────────────────────────
-      # 3. Find and extract project ZIP
+      # 3. Find and extract ZIP
       # ─────────────────────────────────────────────
       - name: Extract Project ZIP
         shell: bash
@@ -47,100 +51,113 @@ jobs:
             exit 1
           fi
 
-          echo "Using project ZIP: $ZIP_FILE"
+          echo "Found ZIP: $ZIP_FILE"
 
           mkdir -p extracted
+
           unzip -q -o "$ZIP_FILE" -d extracted
 
-          echo "Extracted contents:"
+          echo "ZIP extracted successfully."
+
+          echo "Extracted files:"
           find extracted -maxdepth 3 -type f | sort | head -200
 
       # ─────────────────────────────────────────────
-      # 4. Locate actual Android project root
+      # 4. Locate Android/Gradle project
       # ─────────────────────────────────────────────
       - name: Locate Gradle Project
         shell: bash
         run: |
           set -e
 
-          PROJECT_ROOT=$(find extracted -type f -name "settings.gradle.kts" -o -name "settings.gradle" \
-            | head -n 1 \
-            | xargs -r dirname)
+          SETTINGS_FILE=$(find extracted \
+            -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            | head -n 1)
 
-          if [ -z "$PROJECT_ROOT" ]; then
-            echo "ERROR: Could not find settings.gradle.kts or settings.gradle"
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: No settings.gradle.kts or settings.gradle found."
+            echo ""
+            echo "ZIP contents:"
+            find extracted -maxdepth 5 -type f | sort
             exit 1
           fi
 
-          PROJECT_ROOT=$(realpath "$PROJECT_ROOT")
+          PROJECT_ROOT=$(dirname "$(realpath "$SETTINGS_FILE")")
+
+          echo "Gradle project found:"
+          echo "$PROJECT_ROOT"
 
           echo "PROJECT_ROOT=$PROJECT_ROOT" >> "$GITHUB_ENV"
 
-          echo "Project root:"
-          echo "$PROJECT_ROOT"
-
-          echo "Project files:"
-          find "$PROJECT_ROOT" -maxdepth 2 -type f | sort
-
       # ─────────────────────────────────────────────
-      # 5. Verify Gradle wrapper
+      # 5. Verify project
       # ─────────────────────────────────────────────
-      - name: Verify Gradle Wrapper
+      - name: Verify Project
+        working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
         run: |
           set -e
 
-          cd "$PROJECT_ROOT"
+          echo "Project root:"
+          pwd
 
-          if [ ! -f "./gradlew" ]; then
-            echo "ERROR: gradlew is missing from the project ZIP."
-            echo "Generate the wrapper locally before uploading the ZIP."
-            exit 1
-          fi
+          echo ""
+          echo "Project contents:"
+          ls -la
 
-          if [ ! -f "./gradle/wrapper/gradle-wrapper.properties" ]; then
-            echo "ERROR: Gradle wrapper configuration is missing."
-            exit 1
-          fi
-
-          chmod +x ./gradlew
-
-          ./gradlew --version
+          echo ""
+          echo "Gradle files:"
+          find . -maxdepth 3 \
+            \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "gradle-wrapper.properties" \) \
+            -print
 
       # ─────────────────────────────────────────────
       # 6. Setup Gradle
+      #
+      # IMPORTANT:
+      # This comes AFTER ZIP extraction.
       # ─────────────────────────────────────────────
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-home-cache-cleanup: true
+          gradle-version: '8.7'
 
       # ─────────────────────────────────────────────
-      # 7. List Android modules
+      # 7. Check Gradle
+      # ─────────────────────────────────────────────
+      - name: Check Gradle
+        working-directory: ${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          gradle --version
+
+      # ─────────────────────────────────────────────
+      # 8. Inspect Gradle projects
       # ─────────────────────────────────────────────
       - name: Inspect Gradle Projects
         working-directory: ${{ env.PROJECT_ROOT }}
         run: |
-          ./gradlew projects
+          gradle projects --stacktrace
 
       # ─────────────────────────────────────────────
-      # 8. Unit tests
+      # 9. Run unit tests
       # ─────────────────────────────────────────────
       - name: Run Unit Tests
         working-directory: ${{ env.PROJECT_ROOT }}
         run: |
-          ./gradlew \
+          gradle \
             :core-player:testDebugUnitTest \
             --stacktrace \
             --no-daemon
 
       # ─────────────────────────────────────────────
-      # 9. Build library modules
+      # 10. Build library modules
       # ─────────────────────────────────────────────
       - name: Build Library Modules
         working-directory: ${{ env.PROJECT_ROOT }}
         run: |
-          ./gradlew \
+          gradle \
             :core-player:assembleDebug \
             :core-ui-glass:assembleDebug \
             :feature-pulse:assembleDebug \
@@ -149,38 +166,37 @@ jobs:
             --no-daemon
 
       # ─────────────────────────────────────────────
-      # 10. Build application APK
+      # 11. Build APK
       # ─────────────────────────────────────────────
       - name: Build App APK
         working-directory: ${{ env.PROJECT_ROOT }}
         run: |
-          ./gradlew \
+          gradle \
             :app:assembleDebug \
             --stacktrace \
             --no-daemon
 
       # ─────────────────────────────────────────────
-      # 11. Find generated APKs
+      # 12. Find APK
       # ─────────────────────────────────────────────
       - name: Locate APK
         working-directory: ${{ env.PROJECT_ROOT }}
         run: |
-          echo "Generated APK files:"
+          echo "Generated APKs:"
           find . -type f -name "*.apk" -print
 
       # ─────────────────────────────────────────────
-      # 12. Upload APK
+      # 13. Upload APK
       # ─────────────────────────────────────────────
       - name: Upload App APK
         uses: actions/upload-artifact@v4
         with:
           name: mexin-play-app-debug-apk
-          path: |
-            ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
       # ─────────────────────────────────────────────
-      # 13. Upload AAR libraries
+      # 14. Upload AARs
       # ─────────────────────────────────────────────
       - name: Upload Library AARs
         uses: actions/upload-artifact@v4
