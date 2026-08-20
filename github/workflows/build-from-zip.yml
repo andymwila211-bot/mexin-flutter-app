@@ -1,1 +1,40 @@
+name: Build Debug APK from Zip
 
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'quik-source.zip'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Unzip source
+        run: |
+          mkdir -p project
+          unzip -o quik-source.zip -d project
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x project/gradlew
+
+      - name: Build debug APK
+        working-directory: project
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quik-debug-apk
+          path: project/presentation/build/outputs/apk/debug/*.apk
