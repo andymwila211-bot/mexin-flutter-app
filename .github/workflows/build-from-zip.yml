@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'quik-source.zip'
+      - 'mexin-text-source.zip'
 
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
       - name: Unzip source
         run: |
           mkdir -p project
-          unzip -o quik-source.zip -d project
+          unzip -o mexin-text-source.zip -d project
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
